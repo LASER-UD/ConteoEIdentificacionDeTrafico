@@ -1,6 +1,12 @@
 # Conteo e identificacion de tráfico
 Contiene los archivos del proyecto de grado de pregrado de "Conteo e Identificación de tráfico en vídeo mediante un paradigma de inteligencia computacional" 
 
+## Estudiantes
+- Sebastián Leonardo Bejarano Medellín
+- William Eduardo Sierra Lozano
+
+Integrantes del grupo LASER de la Universidad Distrital Francisco José de Caldas
+
 # Métodos utilizados
 - Redes FeedForward
 - Redes convolucionales
