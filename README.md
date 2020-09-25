@@ -10,7 +10,7 @@ Integrantes del grupo LASER de la Universidad Distrital Francisco José de Calda
 # Métodos utilizados
 - Redes FeedForward
 - Redes convolucionales
-- Evolución de arcuitectura con algoritmo genético
+- Evolución de arquitectura con algoritmo genético
 - Transfer Learning
 
 # Pasos del proyecto
