@@ -8,9 +8,9 @@ Contiene los archivos del proyecto de grado de pregrado de "Conteo e Identificac
 Integrantes del grupo LASER de la Universidad Distrital Francisco José de Caldas
 
 # Métodos utilizados
-- Redes FeedForward
-- Redes convolucionales
-- Evolución de arquitectura con algoritmo genético
+- Redes FeedForward (Backpropagation y gradient descent)
+- Redes convolucionales (Backpropagation y gradient descent)
+- Evolución de clasificadores mediante algoritmo genético
 - Transfer Learning
 
 # Pasos del proyecto
@@ -24,10 +24,10 @@ Integrantes del grupo LASER de la Universidad Distrital Francisco José de Calda
 5. Transfer learning con una red convolucional (aún en proceso).
 
 ## Obtención de las ROI y GUI del algoritmo
-1. Implementación con ayuda de OpenCV de los algoritmos de MOG2 y filtraje para obtener la ROI para pasarle a cada red.
+1. Implementación con ayuda de OpenCV de los algoritmos de MOG2 y filtrado para obtener la ROI para pasarle a cada red.
 2. Implementación de la mejor red obtenida para FF, Convolucional, Evolutiva y Transfer learning para observar los resultados.
 3. Tracking de cada objeto para evitar hacer conteo del mismo auto más de una vez (aún en proceso)
-4. Implementación en un sistema embebido con cámara
+4. Implementación en un sistema embebido con cámara (Google Coral dev Board con TPU)
 
 ## Trabajos futuros que pueden servir
 1. Sistema de gestión de energía para el dispositivo para que funcione con batería recargable de manera autónoma.
