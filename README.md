@@ -20,7 +20,7 @@ Integrantes del grupo LASER de la Universidad Distrital Francisco José de Calda
 1. Obtención de los datasets cuyos links se encontrarán en el archivo datasets.txt
 2. Entrenamiento y test de las redes FeedForward utilizando el método de Bag of Visual Words para obtener las características relevantes
 3. Entrenamiento y test de las redes convolucionales
-4. Evolución y entrenamiento mediante un algoritmo genético simple de la arquitectura de una red FeedForward
+4. Evolución y entrenamiento mediante un algoritmo genético simple de las redes convolucionales.
 5. Transfer learning con una red convolucional (aún en proceso).
 
 ## Obtención de las ROI y GUI del algoritmo
