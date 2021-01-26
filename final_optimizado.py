@@ -6,14 +6,15 @@ import numpy as np
 import time
 
 #Rutas importantes
-rutaVideo = './Videos_test/test4.mp4'
-rutaRed = './modelo_VnV_MobileNetV2.tflite'
+rutaVideo = './Videos_test/test3.mp4'
+rutaRed = './modelo_VnV.tflite'
 
 #Cargamos el modelo de TFLite
 interprete = tf.lite.Interpreter(model_path=rutaRed)
 interprete.allocate_tensors()
 
 #Vemos los tensores de entrada y salida
+dimension = 200
 input_details = interprete.get_input_details()
 output_details = interprete.get_output_details()
 
@@ -67,8 +68,8 @@ def escalarImagen(imagen, porcentaje):
 
 def clasificarROI(ROI):
     ROI = cv2.cvtColor(ROI,cv2.COLOR_BGR2RGB)
-    ROI = cv2.resize(ROI, (160,160), interpolation = cv2.INTER_AREA)
-    ROI = ROI.reshape(-1, 160, 160, 3)
+    ROI = cv2.resize(ROI, (dimension,dimension), interpolation = cv2.INTER_AREA)
+    ROI = ROI.reshape(-1, dimension, dimension, 3)
     ROI = np.float32(ROI / 255.0)
     interprete.set_tensor(input_details[0]['index'], ROI)
     interprete.invoke()
