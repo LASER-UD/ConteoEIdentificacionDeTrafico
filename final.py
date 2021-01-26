@@ -81,9 +81,12 @@ frame_count = 0
 #Colocamos un contador de saltar cuadros para ahorrar recursos en la detección
 skip_frames = 15
 
+#limite de conteo
+limite = 0.8
+
 while True:
     ret, frame = vid.read()
-    #frame = frame[0:1500,0:1000,:]
+    #frame = frame[300:,:,:]
     #Cuadro siguiente
     if ret:        
         #Resize
@@ -112,7 +115,7 @@ while True:
                     #Pasamos la imagen por el modelo de Keras para ver si es carro o no
                     ROI = frame[y:y+h,x:x+w,:]                             
                     prediccion = clasificarROI(ROI)
-                    if(prediccion > 0.7):
+                    if(prediccion > 0.4):
                         vehiculo = trackedVehicle(x,y,w,h,prediccion,0)
                         vehiculo.tracker.start_track(frame_rgb,vehiculo.rect)
                         trackedVehicle.nuevoVehiculo(vehiculo)
@@ -121,17 +124,25 @@ while True:
         else:
             for i in trackedVehicle.trackedVehicles:
                 i.tracker.update(frame_rgb)
-                pos = i.tracker.get_position()
-
+                pos = i.tracker.get_position()                
                 #Desempaquetamos la posición
+                startX = pos.left()
+                startY = pos.top()
+                endX = pos.right()
+                endY = pos.bottom()
+                #actualizamos el centroide
+                i.centroide = np.array(((startX+endX)/2,(startY+endY)/2))
+                #Ahora sí pasamos todo a enteros para dibujar
                 startX = int(pos.left())
                 startY = int(pos.top())
                 endX = int(pos.right())
                 endY = int(pos.bottom())
+                if(i.centroide[1]>resized.shape[0]*limite):
+                    trackedVehicle.trackedVehicles.remove(i)
                 # draw the bounding box from the correlation object tracker
                 cv2.rectangle(frame_copia, (startX, startY), (endX, endY),(0, 255, 0), 2)	
                 cv2.putText(frame_copia,"Vehiculo: "+str(i.vehicleScore),(startX,startY-10),cv2.FONT_HERSHEY_SIMPLEX,0.3,(0, 255, 0),1)		    
-
+                image = cv2.circle(frame_copia, (int(i.centroide[0]),int(i.centroide[1])), radius=3, color=(0, 255, 0), thickness=-1)
         #Ahora mostramos el frame copia con los contornos dibujados
         cv2.imshow('BBoxes',frame_copia)        
         if cv2.waitKey(1) & 0xFF == ord('q'):
