@@ -7,16 +7,27 @@ import time
 
 #Rutas importantes
 rutaVideo = './Videos_test/test3.mp4'
-rutaRed = './modelo_VnV.tflite'
+rutaRedVnV = './modelo_VnV.tflite'
+rutaRedTipo = './modelo_Tipo_MobileNetV2.tflite'
 
-#Cargamos el modelo de TFLite
-interprete = tf.lite.Interpreter(model_path=rutaRed)
-interprete.allocate_tensors()
+#Cargamos el modelo Vehiculo No Vehiculo de TFLite
+interprete_VnV = tf.lite.Interpreter(model_path=rutaRedVnV)
+interprete_VnV.allocate_tensors()
 
 #Vemos los tensores de entrada y salida
-dimension = 200
-input_details = interprete.get_input_details()
-output_details = interprete.get_output_details()
+dimension_VnV = 200
+input_details_VnV = interprete_VnV.get_input_details()
+output_details_VnV = interprete_VnV.get_output_details()
+
+
+#Cargamos el modelo Tipo de TFLite
+interprete_Tipo = tf.lite.Interpreter(model_path=rutaRedTipo)
+interprete_Tipo.allocate_tensors()
+
+#Vemos los tensores de entrada y salida
+dimension_Tipo = 160
+input_details_Tipo = interprete_Tipo.get_input_details()
+output_details_Tipo = interprete_Tipo.get_output_details()
 
 #clase trackedVehicle
 class trackedVehicle:
@@ -33,7 +44,7 @@ class trackedVehicle:
         noExiste = True
         for i in trackedVehicle.trackedVehicles:
             distancia = np.linalg.norm(i.centroide-vehiculo.centroide)
-            if(distancia < 50):
+            if(distancia < 200):
                 noExiste = False
         if(noExiste):
             trackedVehicle.trackedVehicles.append(vehiculo)
@@ -66,14 +77,24 @@ def escalarImagen(imagen, porcentaje):
     frame = cv2.resize(imagen, dim, interpolation = cv2.INTER_AREA)
     return frame
 
-def clasificarROI(ROI):
-    ROI = cv2.cvtColor(ROI,cv2.COLOR_BGR2RGB)
-    ROI = cv2.resize(ROI, (dimension,dimension), interpolation = cv2.INTER_AREA)
-    ROI = ROI.reshape(-1, dimension, dimension, 3)
-    ROI = np.float32(ROI / 255.0)
-    interprete.set_tensor(input_details[0]['index'], ROI)
-    interprete.invoke()
-    pred = interprete.get_tensor(output_details[0]['index'])
+def distinguirROI(ROI_1):
+    ROI_1 = cv2.cvtColor(ROI_1,cv2.COLOR_BGR2RGB)
+    ROI_1 = cv2.resize(ROI_1, (dimension_VnV,dimension_VnV), interpolation = cv2.INTER_AREA)
+    ROI_1 = ROI_1.reshape(-1, dimension_VnV, dimension_VnV, 3)
+    ROI_1 = np.float32(ROI_1 / 255.0)
+    interprete_VnV.set_tensor(input_details_VnV[0]['index'], ROI_1)
+    interprete_VnV.invoke()
+    pred = interprete_VnV.get_tensor(output_details_VnV[0]['index'])
+    return pred[0]
+
+def clasificarVehiculo(ROI_1):
+    ROI_1 = cv2.cvtColor(ROI_1,cv2.COLOR_BGR2RGB)
+    ROI_1 = cv2.resize(ROI_1, (dimension_Tipo,dimension_Tipo), interpolation = cv2.INTER_AREA)
+    ROI_1 = ROI_1.reshape(-1, dimension_Tipo, dimension_Tipo, 3)
+    ROI_1 = np.float32(ROI_1 / 255.0)
+    interprete_Tipo.set_tensor(input_details_Tipo[0]['index'], ROI_1)
+    interprete_Tipo.invoke()
+    pred = interprete_Tipo.get_tensor(output_details_Tipo[0]['index'])
     return pred[0]
 
 #Creamos elemento de video
@@ -122,10 +143,11 @@ while True:
                     #Pasamos la imagen por el modelo de Keras para ver si es carro o no
                     ROI = frame[y:y+h,x:x+w,:]             
                     t0 = time.clock()                 
-                    prediccion = clasificarROI(ROI)
+                    prediccion = distinguirROI(ROI)
                     t1 = time.clock()-t0
                     print(t1)
-                    if(prediccion > 0.4):
+                    if(prediccion > 0.7):
+                        pred_tipo = np.argmax(clasificarVehiculo(ROI))
                         vehiculo = trackedVehicle(x,y,w,h,prediccion,0)
                         vehiculo.tracker.start_track(frame_rgb,vehiculo.rect)
                         trackedVehicle.nuevoVehiculo(vehiculo)
