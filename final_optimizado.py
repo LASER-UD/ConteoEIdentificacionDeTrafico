@@ -2,14 +2,20 @@
 import tensorflow as tf
 import cv2
 import dlib
-import tensorflow.keras
-from tensorflow.keras.models import load_model
 import numpy as np
 import time
 
 #Rutas importantes
-rutaVideo = './Videos_test/test3.mp4'
-rutaRed = './Resultados/Convolucional/V_NoV/Arquitectura4_LR_0_01/arq4_1.hdf5'
+rutaVideo = './Videos_test/test4.mp4'
+rutaRed = './modelo_VnV_MobileNetV2.tflite'
+
+#Cargamos el modelo de TFLite
+interprete = tf.lite.Interpreter(model_path=rutaRed)
+interprete.allocate_tensors()
+
+#Vemos los tensores de entrada y salida
+input_details = interprete.get_input_details()
+output_details = interprete.get_output_details()
 
 #clase trackedVehicle
 class trackedVehicle:
@@ -61,10 +67,12 @@ def escalarImagen(imagen, porcentaje):
 
 def clasificarROI(ROI):
     ROI = cv2.cvtColor(ROI,cv2.COLOR_BGR2RGB)
-    ROI = cv2.resize(ROI, (200,200), interpolation = cv2.INTER_AREA)
-    ROI = ROI.reshape(-1, 200, 200, 3)
-    ROI = ROI / 255
-    pred = red.predict(ROI)
+    ROI = cv2.resize(ROI, (160,160), interpolation = cv2.INTER_AREA)
+    ROI = ROI.reshape(-1, 160, 160, 3)
+    ROI = np.float32(ROI / 255.0)
+    interprete.set_tensor(input_details[0]['index'], ROI)
+    interprete.invoke()
+    pred = interprete.get_tensor(output_details[0]['index'])
     return pred[0]
 
 #Creamos elemento de video
@@ -72,9 +80,6 @@ vid = cv2.VideoCapture(rutaVideo)
 
 #Creamos el substractor de fondo
 mask_fondo = cv2.createBackgroundSubtractorMOG2()
-
-#Cargamos el modelo de Keras
-red = load_model(rutaRed)
 
 #Iniciamos un contador de cuadros pasados
 frame_count = 0
@@ -92,7 +97,7 @@ while True:
     if ret:        
         #Resize
         resized = escalarImagen(frame,100)
-        frame_rgb = cv2.cvtColor(resized,cv2.COLOR_BGR2RGB);
+        frame_rgb = cv2.cvtColor(resized,cv2.COLOR_BGR2RGB)
         #Mostramos el vídeo original
         cv2.imshow('frame',resized)
         #Aplicamos el sustractor de fondo
@@ -114,8 +119,8 @@ while True:
                 x,y,w,h = rect
                 if(w > 20 and h > 20):
                     #Pasamos la imagen por el modelo de Keras para ver si es carro o no
-                    ROI = frame[y:y+h,x:x+w,:]       
-                    t0 = time.clock()                      
+                    ROI = frame[y:y+h,x:x+w,:]             
+                    t0 = time.clock()                 
                     prediccion = clasificarROI(ROI)
                     t1 = time.clock()-t0
                     print(t1)
