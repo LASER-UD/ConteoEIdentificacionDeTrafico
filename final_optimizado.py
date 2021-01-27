@@ -6,9 +6,9 @@ import numpy as np
 import time
 
 #Rutas importantes
-rutaVideo = './Videos_test/test3.mp4'
+rutaVideo = './Videos_test/test5.mp4'
 rutaRedVnV = './modelo_VnV.tflite'
-rutaRedTipo = './modelo_Tipo_MobileNetV2.tflite'
+rutaRedTipo = './modelo_Tipo_.tflite'
 
 #Cargamos el modelo Vehiculo No Vehiculo de TFLite
 interprete_VnV = tf.lite.Interpreter(model_path=rutaRedVnV)
@@ -25,17 +25,18 @@ interprete_Tipo = tf.lite.Interpreter(model_path=rutaRedTipo)
 interprete_Tipo.allocate_tensors()
 
 #Vemos los tensores de entrada y salida
-dimension_Tipo = 160
+dimension_Tipo = 200
 input_details_Tipo = interprete_Tipo.get_input_details()
 output_details_Tipo = interprete_Tipo.get_output_details()
 
 #clase trackedVehicle
 class trackedVehicle:
     trackedVehicles = []    
-    def __init__(self, x, y, w, h, vehicleScore, typeScore):
+    def __init__(self, x, y, w, h, vehicleScore, type, typeScore):
         self.x = x
         self.y = y
         self.vehicleScore = vehicleScore
+        self.type = type
         self.typeScore = typeScore
         self.centroide = np.array((x+(w/2), y+(h/2)))
         self.tracker = dlib.correlation_tracker()
@@ -52,7 +53,7 @@ class trackedVehicle:
 
 #Función para filtrar la máscara obtenida del background substraction
 def filter_mask(fg_mask):
-    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2, 2))
 
     # Fill any small holes
     closing = cv2.morphologyEx(fg_mask, cv2.MORPH_CLOSE, kernel)
@@ -60,7 +61,7 @@ def filter_mask(fg_mask):
     opening = cv2.morphologyEx(closing, cv2.MORPH_OPEN, kernel)
 
     # Dilate to merge adjacent blobs
-    dilation = cv2.dilate(opening, kernel, iterations = 1)
+    dilation = cv2.dilate(opening, kernel, iterations = 2)
 
     #Thresholding
     _,thresh1 = cv2.threshold(dilation,254,255,cv2.THRESH_BINARY)
@@ -87,12 +88,12 @@ def distinguirROI(ROI_1):
     pred = interprete_VnV.get_tensor(output_details_VnV[0]['index'])
     return pred[0]
 
-def clasificarVehiculo(ROI_1):
-    ROI_1 = cv2.cvtColor(ROI_1,cv2.COLOR_BGR2RGB)
-    ROI_1 = cv2.resize(ROI_1, (dimension_Tipo,dimension_Tipo), interpolation = cv2.INTER_AREA)
-    ROI_1 = ROI_1.reshape(-1, dimension_Tipo, dimension_Tipo, 3)
-    ROI_1 = np.float32(ROI_1 / 255.0)
-    interprete_Tipo.set_tensor(input_details_Tipo[0]['index'], ROI_1)
+def clasificarVehiculo(ROI_2):
+    ROI_2 = cv2.cvtColor(ROI_2,cv2.COLOR_BGR2RGB)
+    ROI_2 = cv2.resize(ROI_2, (dimension_Tipo,dimension_Tipo), interpolation = cv2.INTER_AREA)
+    ROI_2 = ROI_2.reshape(-1, dimension_Tipo, dimension_Tipo, 3)
+    ROI_2 = np.float32(ROI_2 / 255.0)
+    interprete_Tipo.set_tensor(input_details_Tipo[0]['index'], ROI_2)
     interprete_Tipo.invoke()
     pred = interprete_Tipo.get_tensor(output_details_Tipo[0]['index'])
     return pred[0]
@@ -132,23 +133,21 @@ while True:
         #creamos una copia del frame original
         frame_copia = resized.copy()
         frame_count = frame_count + 1
-        if(frame_count > 200 and frame_count % skip_frames == 0):
+        if(frame_count > 100 and frame_count % skip_frames == 0):
             #Ahora detectamos los contornos en la imagen
             contours, hierarchy = cv2.findContours(filtrada, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
             #Dibujamos los bounding boxes para cada contorno
             for c in contours:
                 rect = cv2.boundingRect(c)
                 x,y,w,h = rect
-                if(w > 20 and h > 20):
+                if(w > 40 and h > 40):
                     #Pasamos la imagen por el modelo de Keras para ver si es carro o no
-                    ROI = frame[y:y+h,x:x+w,:]             
-                    t0 = time.clock()                 
-                    prediccion = distinguirROI(ROI)
-                    t1 = time.clock()-t0
-                    print(t1)
-                    if(prediccion > 0.7):
-                        pred_tipo = np.argmax(clasificarVehiculo(ROI))
-                        vehiculo = trackedVehicle(x,y,w,h,prediccion,0)
+                    ROI = frame[y:y+h,x:x+w,:]                                 
+                    prediccion = distinguirROI(ROI)                                        
+                    if(prediccion > 0.5):
+                        pred_tipo = clasificarVehiculo(ROI)
+                        tipo = np.argmax(pred_tipo)
+                        vehiculo = trackedVehicle(x,y,w,h,prediccion,tipo,pred_tipo[tipo])
                         vehiculo.tracker.start_track(frame_rgb,vehiculo.rect)
                         trackedVehicle.nuevoVehiculo(vehiculo)
 
@@ -172,9 +171,24 @@ while True:
                 if(i.centroide[1]>resized.shape[0]*limite):
                     trackedVehicle.trackedVehicles.remove(i)
                 # draw the bounding box from the correlation object tracker
-                cv2.rectangle(frame_copia, (startX, startY), (endX, endY),(0, 255, 0), 2)	
-                cv2.putText(frame_copia,"Vehiculo: "+str(i.vehicleScore),(startX,startY-10),cv2.FONT_HERSHEY_SIMPLEX,0.3,(0, 255, 0),1)		    
-                image = cv2.circle(frame_copia, (int(i.centroide[0]),int(i.centroide[1])), radius=3, color=(0, 255, 0), thickness=-1)
+                cv2.rectangle(frame_copia, (startX, startY), (endX, endY),(0, 255, 0), 2)	                
+                if(i.type == 0):
+                    Tipo = "Ambulancia"
+                elif(i.type == 1):
+                    Tipo = "Bicicleta"
+                elif(i.type == 2):
+                    Tipo = "Bus"
+                elif(i.type == 3):
+                    Tipo = "Camion"
+                elif(i.type == 4):
+                    Tipo = "Carro"
+                elif(i.type == 5):
+                    Tipo = "Moto"
+                elif(i.type == 6):
+                    Tipo = "Taxi"
+                elif(i.type == 7):
+                    Tipo = "Van"
+                cv2.putText(frame_copia,Tipo+"%.2f"%i.typeScore,(startX,startY-10),cv2.FONT_HERSHEY_SIMPLEX,0.3,(0, 255, 0),1)		                    
         #Ahora mostramos el frame copia con los contornos dibujados
         cv2.imshow('BBoxes',frame_copia)        
         if cv2.waitKey(1) & 0xFF == ord('q'):
