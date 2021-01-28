@@ -4,11 +4,12 @@ import cv2
 import dlib
 import numpy as np
 import time
+from datetime import datetime
 
 #Rutas importantes
-rutaVideo = './Videos_test/test5.mp4'
+rutaVideo = './Videos_test/test3.mp4'
 rutaRedVnV = './modelo_VnV.tflite'
-rutaRedTipo = './modelo_Tipo_.tflite'
+rutaRedTipo = './modelo_Tipo_MobileNetV2.tflite'
 
 #Cargamos el modelo Vehiculo No Vehiculo de TFLite
 interprete_VnV = tf.lite.Interpreter(model_path=rutaRedVnV)
@@ -25,7 +26,7 @@ interprete_Tipo = tf.lite.Interpreter(model_path=rutaRedTipo)
 interprete_Tipo.allocate_tensors()
 
 #Vemos los tensores de entrada y salida
-dimension_Tipo = 200
+dimension_Tipo = 224
 input_details_Tipo = interprete_Tipo.get_input_details()
 output_details_Tipo = interprete_Tipo.get_output_details()
 
@@ -53,7 +54,7 @@ class trackedVehicle:
 
 #Función para filtrar la máscara obtenida del background substraction
 def filter_mask(fg_mask):
-    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2, 2))
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
 
     # Fill any small holes
     closing = cv2.morphologyEx(fg_mask, cv2.MORPH_CLOSE, kernel)
@@ -98,6 +99,11 @@ def clasificarVehiculo(ROI_2):
     pred = interprete_Tipo.get_tensor(output_details_Tipo[0]['index'])
     return pred[0]
 
+##Conexión a la base de datos
+from pymongo import MongoClient
+cliente = MongoClient("mongodb://localhost:27017")
+db = cliente.Vehiculos
+#Fin conexión a la base de datos 
 #Creamos elemento de video
 vid = cv2.VideoCapture(rutaVideo)
 
@@ -108,18 +114,34 @@ mask_fondo = cv2.createBackgroundSubtractorMOG2()
 frame_count = 0
 
 #Colocamos un contador de saltar cuadros para ahorrar recursos en la detección
-skip_frames = 15
+skip_frames = 10
 
 #limite de conteo
 limite = 0.8
 
+#bandera de carros bajando
+Bajando = True
+
+#Vehiculos contados
+VehiculosContados = 0;
 while True:
     ret, frame = vid.read()
-    #frame = frame[300:,:,:]
+    #frame = frame[100:,:650,:]
     #Cuadro siguiente
-    if ret:        
+    if ret:    
+        #INTERFAZ DEL CONTEO DE VEHICULOS        
         #Resize
         resized = escalarImagen(frame,100)
+        if(Bajando):
+            X_start_GUI = 0 
+            X_end_GUI = int(frame.shape[1])
+            Y_start_GUI = int(limite*frame.shape[0])
+            Y_end_GUI = int(frame.shape[0])  
+        else:            
+            X_start_GUI = 0 
+            X_end_GUI = int(frame.shape[1])
+            Y_start_GUI = 0
+            Y_end_GUI = int((1-limite)*frame.shape[0])        
         frame_rgb = cv2.cvtColor(resized,cv2.COLOR_BGR2RGB)
         #Mostramos el vídeo original
         cv2.imshow('frame',resized)
@@ -132,10 +154,15 @@ while True:
         cv2.imshow('filtrada',filtrada)        
         #creamos una copia del frame original
         frame_copia = resized.copy()
+        cv2.rectangle(frame_copia,(X_start_GUI,Y_start_GUI),(X_end_GUI,Y_end_GUI),(0,0,255),-1)
+        cv2.putText(frame_copia,"Vehiculos contados: "+str(VehiculosContados),(int((X_end_GUI+X_start_GUI)/2 - 200),int((Y_end_GUI+Y_start_GUI)/2)),cv2.FONT_HERSHEY_SIMPLEX,2,(0, 0, 0),2)		                    
         frame_count = frame_count + 1
         if(frame_count > 100 and frame_count % skip_frames == 0):
             #Ahora detectamos los contornos en la imagen
-            contours, hierarchy = cv2.findContours(filtrada, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+            if Bajando:
+                contours, hierarchy = cv2.findContours(filtrada[:int(limite*filtrada.shape[0]),:], cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+            else:
+                contours, hierarchy = cv2.findContours(filtrada[int((1-limite)*filtrada.shape[0]):,:], cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
             #Dibujamos los bounding boxes para cada contorno
             for c in contours:
                 rect = cv2.boundingRect(c)
@@ -144,7 +171,7 @@ while True:
                     #Pasamos la imagen por el modelo de Keras para ver si es carro o no
                     ROI = frame[y:y+h,x:x+w,:]                                 
                     prediccion = distinguirROI(ROI)                                        
-                    if(prediccion > 0.5):
+                    if(prediccion > 0.4):
                         pred_tipo = clasificarVehiculo(ROI)
                         tipo = np.argmax(pred_tipo)
                         vehiculo = trackedVehicle(x,y,w,h,prediccion,tipo,pred_tipo[tipo])
@@ -168,8 +195,29 @@ while True:
                 startY = int(pos.top())
                 endX = int(pos.right())
                 endY = int(pos.bottom())
-                if(i.centroide[1]>resized.shape[0]*limite):
+                w = endX - startX
+                h = endY - startY
+                if (h > 250 or w > 250):
                     trackedVehicle.trackedVehicles.remove(i)
+                if(Bajando):
+                    if(i.centroide[1]>resized.shape[0]*limite):
+                        trackedVehicle.trackedVehicles.remove(i)                        
+                        VehiculosContados+=1
+                        fecha = datetime.now()
+                        dict = {
+                            "score" : str(i.vehicleScore),
+                            "tipo" : str(i.type),
+                            "hora" : str(fecha.hour),
+                            "minuto" : str(fecha.minute),
+                            "dia" : str(fecha.day),
+                            "mes" : str(fecha.month),
+                            "año" : str(fecha.year)
+                        }
+                        result = db.Registro.insert_one(dict)
+                else:
+                    if(i.centroide[1]<resized.shape[0]*(1-limite)):
+                        trackedVehicle.trackedVehicles.remove(i)
+                        VehiculosContados+=1
                 # draw the bounding box from the correlation object tracker
                 cv2.rectangle(frame_copia, (startX, startY), (endX, endY),(0, 255, 0), 2)	                
                 if(i.type == 0):
@@ -189,6 +237,8 @@ while True:
                 elif(i.type == 7):
                     Tipo = "Van"
                 cv2.putText(frame_copia,Tipo+"%.2f"%i.typeScore,(startX,startY-10),cv2.FONT_HERSHEY_SIMPLEX,0.3,(0, 255, 0),1)		                    
+                cv2.rectangle(frame_copia,(X_start_GUI,Y_start_GUI),(X_end_GUI,Y_end_GUI),(0,0,255),-1)
+                cv2.putText(frame_copia,"Vehiculos contados: "+str(VehiculosContados),(int((X_end_GUI+X_start_GUI)/2-200),int((Y_end_GUI+Y_start_GUI)/2)),cv2.FONT_HERSHEY_SIMPLEX,2,(0, 0, 0),2)		                    
         #Ahora mostramos el frame copia con los contornos dibujados
         cv2.imshow('BBoxes',frame_copia)        
         if cv2.waitKey(1) & 0xFF == ord('q'):
