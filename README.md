@@ -26,8 +26,8 @@ Integrantes del grupo LASER de la Universidad Distrital Francisco José de Calda
 ## Obtención de las ROI y GUI del algoritmo
 1. Implementación con ayuda de OpenCV de los algoritmos de MOG2 y filtrado para obtener la ROI para pasarle a cada red.
 2. Implementación de la mejor red obtenida para FF, Convolucional, Evolutiva y Transfer learning para observar los resultados.
-3. Tracking de cada objeto para evitar hacer conteo del mismo auto más de una vez (aún en proceso)
-4. Implementación en un sistema embebido con cámara (Google Coral dev Board con TPU)
+3. Tracking de cada objeto para evitar hacer conteo del mismo auto más de una vez
+4. Implementación en un sistema embebido con cámara (Google Coral dev Board con TPU) (En proceso)
 
 ## Trabajos futuros que pueden servir
 1. Sistema de gestión de energía para el dispositivo para que funcione con batería recargable de manera autónoma.
