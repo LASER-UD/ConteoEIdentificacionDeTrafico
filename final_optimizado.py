@@ -9,7 +9,8 @@ from datetime import datetime
 #Rutas importantes
 rutaVideo = './Videos_test/test3.mp4'
 rutaRedVnV = './modelo_VnV.tflite'
-rutaRedTipo = './modelo_Tipo_MobileNetV2.tflite'
+rutaRedTipo = './modelo_Tipo_2.tflite'
+
 
 #Cargamos el modelo Vehiculo No Vehiculo de TFLite
 interprete_VnV = tf.lite.Interpreter(model_path=rutaRedVnV)
@@ -26,7 +27,7 @@ interprete_Tipo = tf.lite.Interpreter(model_path=rutaRedTipo)
 interprete_Tipo.allocate_tensors()
 
 #Vemos los tensores de entrada y salida
-dimension_Tipo = 224
+dimension_Tipo = 200
 input_details_Tipo = interprete_Tipo.get_input_details()
 output_details_Tipo = interprete_Tipo.get_output_details()
 
@@ -117,10 +118,16 @@ frame_count = 0
 skip_frames = 10
 
 #limite de conteo
-limite = 0.8
+limite = 0.78
 
 #bandera de carros bajando
 Bajando = True
+
+#Porcentaje de tamaño de la ventana boxes
+boxesPercent = 70
+
+#Porcentaje de reducción o ampliación de la imagen original
+percentFrame = 100
 
 #Vehiculos contados
 VehiculosContados = 0;
@@ -131,17 +138,17 @@ while True:
     if ret:    
         #INTERFAZ DEL CONTEO DE VEHICULOS        
         #Resize
-        resized = escalarImagen(frame,100)
+        resized = escalarImagen(frame,percentFrame)
         if(Bajando):
             X_start_GUI = 0 
-            X_end_GUI = int(frame.shape[1])
-            Y_start_GUI = int(limite*frame.shape[0])
-            Y_end_GUI = int(frame.shape[0])  
+            X_end_GUI = int(resized.shape[1])
+            Y_start_GUI = int(limite*resized.shape[0])
+            Y_end_GUI = int(resized.shape[0])  
         else:            
             X_start_GUI = 0 
-            X_end_GUI = int(frame.shape[1])
+            X_end_GUI = int(resized.shape[1])
             Y_start_GUI = 0
-            Y_end_GUI = int((1-limite)*frame.shape[0])        
+            Y_end_GUI = int((1-limite)*resized.shape[0])        
         frame_rgb = cv2.cvtColor(resized,cv2.COLOR_BGR2RGB)
         #Mostramos el vídeo original
         cv2.imshow('frame',resized)
@@ -171,7 +178,7 @@ while True:
                     #Pasamos la imagen por el modelo de Keras para ver si es carro o no
                     ROI = frame[y:y+h,x:x+w,:]                                 
                     prediccion = distinguirROI(ROI)                                        
-                    if(prediccion > 0.4):
+                    if(prediccion > 0.6):
                         pred_tipo = clasificarVehiculo(ROI)
                         tipo = np.argmax(pred_tipo)
                         vehiculo = trackedVehicle(x,y,w,h,prediccion,tipo,pred_tipo[tipo])
@@ -197,7 +204,7 @@ while True:
                 endY = int(pos.bottom())
                 w = endX - startX
                 h = endY - startY
-                if (h > 250 or w > 250):
+                if(w > resized.shape[1]*0.3 or h > resized.shape[0]*0.3):
                     trackedVehicle.trackedVehicles.remove(i)
                 if(Bajando):
                     if(i.centroide[1]>resized.shape[0]*limite):
@@ -240,7 +247,8 @@ while True:
                 cv2.rectangle(frame_copia,(X_start_GUI,Y_start_GUI),(X_end_GUI,Y_end_GUI),(0,0,255),-1)
                 cv2.putText(frame_copia,"Vehiculos contados: "+str(VehiculosContados),(int((X_end_GUI+X_start_GUI)/2-200),int((Y_end_GUI+Y_start_GUI)/2)),cv2.FONT_HERSHEY_SIMPLEX,2,(0, 0, 0),2)		                    
         #Ahora mostramos el frame copia con los contornos dibujados
-        cv2.imshow('BBoxes',frame_copia)        
+        boxesResized = escalarImagen(frame_copia,boxesPercent)
+        cv2.imshow('BBoxes',boxesResized)        
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
     else:
