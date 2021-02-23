@@ -170,7 +170,7 @@ limite = 0.78
 Bajando = True
 
 #Porcentaje de tamaño de la ventana boxes
-boxesPercent = 90
+boxesPercent = 70
 
 #Porcentaje de reducción o ampliación de la imagen original
 percentFrame = 100
@@ -179,7 +179,7 @@ percentFrame = 100
 VehiculosContados = 0
 
 #Linea de la velocidad
-lineaVelocidad = 0.68
+lineaVelocidad = limite - 0.1
 distanciaVelocidad = 10
 
 #Etiquetador de color
@@ -191,8 +191,7 @@ while True:
     if ret:    
         #INTERFAZ DEL CONTEO DE VEHICULOS        
         #Resize
-        resized = escalarImagen(frame,percentFrame)
-        lineaInicio = (0,)
+        resized = escalarImagen(frame,percentFrame)        
         if(Bajando):
             X_start_GUI = 0 
             X_end_GUI = int(resized.shape[1])
@@ -215,9 +214,10 @@ while True:
         cv2.imshow('filtrada',filtrada)        
         #creamos una copia del frame original
         frame_copia = resized.copy()
-        #cv2.rectangle(frame_copia,(X_start_GUI,Y_start_GUI),(X_end_GUI,Y_end_GUI),(0,0,255),-1)
-        #cv2.putText(frame_copia,"Vehiculos contados: "+str(VehiculosContados),(int((X_end_GUI+X_start_GUI)/2 - 200),int((Y_end_GUI+Y_start_GUI)/2)),cv2.FONT_HERSHEY_SIMPLEX,2,(0, 0, 0),2)		                    
-        #cv2.line(frame_copia,(0,int(resized.shape[0]*lineaVelocidad)),(resized.shape[1],int(resized.shape[0]*lineaVelocidad)),(255,0,0),1)
+        cv2.rectangle(frame_copia,(X_start_GUI,Y_start_GUI),(X_end_GUI,Y_end_GUI),(0,0,255),-1)
+        cv2.putText(frame_copia,"Vehiculos contados: "+str(VehiculosContados),(int((X_end_GUI+X_start_GUI)/2 - 200),int((Y_end_GUI+Y_start_GUI)/2)),cv2.FONT_HERSHEY_SIMPLEX,2,(0, 0, 0),2)		                    
+        cv2.putText(frame_copia,"Linea de velocidad",(0+20,int(resized.shape[0]*lineaVelocidad)-10),cv2.FONT_HERSHEY_SIMPLEX,0.6,(255, 0, 0),1)		                    
+        cv2.line(frame_copia,(0,int(resized.shape[0]*lineaVelocidad)),(resized.shape[1],int(resized.shape[0]*lineaVelocidad)),(255,0,0),1)
         frame_count = frame_count + 1
         if(frame_count > 100 and frame_count % skip_frames == 0):
             #Ahora detectamos los contornos en la imagen
@@ -277,8 +277,7 @@ while True:
                             "tipo" : str(i.type),
                             "color" : str(i.color),
                             "velocidad" : str(i.velocidad),
-                            "hora" : str(fecha.hour),
-                            "minuto" : str(fecha.minute),
+                            "hora" : str(fecha.hour)+":"+str(fecha.minute)+":"+str(fecha.second),
                             "fecha" : str(fecha.day)+"-"+str(fecha.month)+"-"+str(fecha.year)                            
                         }
                         result = db.Registro.insert_one(dict)
@@ -305,9 +304,10 @@ while True:
                 elif(i.type == 7):
                     Tipo = "Van"
                 cv2.putText(frame_copia,Tipo+"%.2f"%i.typeScore,(startX,startY-10),cv2.FONT_HERSHEY_SIMPLEX,0.3,(0, 255, 0),1)		                    
-                #cv2.rectangle(frame_copia,(X_start_GUI,Y_start_GUI),(X_end_GUI,Y_end_GUI),(0,0,255),-1)
-                #cv2.line(frame_copia,(0,int(resized.shape[0]*lineaVelocidad)),(resized.shape[1],int(resized.shape[0]*lineaVelocidad)),(255,0,0),1)
-                #cv2.putText(frame_copia,"Vehiculos contados: "+str(VehiculosContados),(int((X_end_GUI+X_start_GUI)/2-200),int((Y_end_GUI+Y_start_GUI)/2)),cv2.FONT_HERSHEY_SIMPLEX,2,(0, 0, 0),2)		                    
+                cv2.rectangle(frame_copia,(X_start_GUI,Y_start_GUI),(X_end_GUI,Y_end_GUI),(0,0,255),-1)
+                cv2.line(frame_copia,(0,int(resized.shape[0]*lineaVelocidad)),(resized.shape[1],int(resized.shape[0]*lineaVelocidad)),(255,0,0),1)
+                cv2.putText(frame_copia,"Linea de velocidad",(0+20,int(resized.shape[0]*lineaVelocidad)-10),cv2.FONT_HERSHEY_SIMPLEX,0.6,(255, 0, 0),1)		                    
+                cv2.putText(frame_copia,"Vehiculos contados: "+str(VehiculosContados),(int((X_end_GUI+X_start_GUI)/2-200),int((Y_end_GUI+Y_start_GUI)/2)),cv2.FONT_HERSHEY_SIMPLEX,2,(0, 0, 0),2)		                    
         #Ahora mostramos el frame copia con los contornos dibujados
         boxesResized = escalarImagen(frame_copia,boxesPercent)
         cv2.imshow('BBoxes',boxesResized)        
