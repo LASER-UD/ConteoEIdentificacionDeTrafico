@@ -11,7 +11,7 @@ from scipy.spatial import distance as dist
 #Rutas importantes
 rutaVideo = './Videos_test/test3.mp4'
 rutaRedVnV = './modelo_VnV.tflite'
-rutaRedTipo = './modelo_Tipo_2.tflite'
+rutaRedTipo = './modelo_Tipo_Transfer.tflite'
 
 
 #Cargamos el modelo Vehiculo No Vehiculo de TFLite
@@ -29,7 +29,7 @@ interprete_Tipo = tf.lite.Interpreter(model_path=rutaRedTipo)
 interprete_Tipo.allocate_tensors()
 
 #Vemos los tensores de entrada y salida
-dimension_Tipo = 200
+dimension_Tipo = 224
 input_details_Tipo = interprete_Tipo.get_input_details()
 output_details_Tipo = interprete_Tipo.get_output_details()
 
@@ -140,7 +140,7 @@ def clasificarVehiculo(ROI_2):
     ROI_2 = cv2.cvtColor(ROI_2,cv2.COLOR_BGR2RGB)
     ROI_2 = cv2.resize(ROI_2, (dimension_Tipo,dimension_Tipo), interpolation = cv2.INTER_AREA)
     ROI_2 = ROI_2.reshape(-1, dimension_Tipo, dimension_Tipo, 3)
-    ROI_2 = np.float32(ROI_2 / 255.0)
+    ROI_2 = np.float32(ROI_2 / 1.0)
     interprete_Tipo.set_tensor(input_details_Tipo[0]['index'], ROI_2)
     interprete_Tipo.invoke()
     pred = interprete_Tipo.get_tensor(output_details_Tipo[0]['index'])
@@ -170,7 +170,7 @@ limite = 0.78
 Bajando = True
 
 #Porcentaje de tamaño de la ventana boxes
-boxesPercent = 70
+boxesPercent = 90
 
 #Porcentaje de reducción o ampliación de la imagen original
 percentFrame = 100
@@ -215,9 +215,9 @@ while True:
         cv2.imshow('filtrada',filtrada)        
         #creamos una copia del frame original
         frame_copia = resized.copy()
-        cv2.rectangle(frame_copia,(X_start_GUI,Y_start_GUI),(X_end_GUI,Y_end_GUI),(0,0,255),-1)
-        cv2.putText(frame_copia,"Vehiculos contados: "+str(VehiculosContados),(int((X_end_GUI+X_start_GUI)/2 - 200),int((Y_end_GUI+Y_start_GUI)/2)),cv2.FONT_HERSHEY_SIMPLEX,2,(0, 0, 0),2)		                    
-        cv2.line(frame_copia,(0,int(resized.shape[0]*lineaVelocidad)),(resized.shape[1],int(resized.shape[0]*lineaVelocidad)),(255,0,0),1)
+        #cv2.rectangle(frame_copia,(X_start_GUI,Y_start_GUI),(X_end_GUI,Y_end_GUI),(0,0,255),-1)
+        #cv2.putText(frame_copia,"Vehiculos contados: "+str(VehiculosContados),(int((X_end_GUI+X_start_GUI)/2 - 200),int((Y_end_GUI+Y_start_GUI)/2)),cv2.FONT_HERSHEY_SIMPLEX,2,(0, 0, 0),2)		                    
+        #cv2.line(frame_copia,(0,int(resized.shape[0]*lineaVelocidad)),(resized.shape[1],int(resized.shape[0]*lineaVelocidad)),(255,0,0),1)
         frame_count = frame_count + 1
         if(frame_count > 100 and frame_count % skip_frames == 0):
             #Ahora detectamos los contornos en la imagen
@@ -233,7 +233,7 @@ while True:
                     #Pasamos la imagen por el modelo de Keras para ver si es carro o no
                     ROI = frame[y:y+h,x:x+w,:]                                 
                     prediccion = distinguirROI(ROI)                                        
-                    if(prediccion > 0.6):
+                    if(prediccion > 0.5):
                         pred_tipo = clasificarVehiculo(ROI)                        
                         color = cl.labelFunc(ROI)
                         tipo = np.argmax(pred_tipo)
@@ -279,9 +279,7 @@ while True:
                             "velocidad" : str(i.velocidad),
                             "hora" : str(fecha.hour),
                             "minuto" : str(fecha.minute),
-                            "dia" : str(fecha.day),
-                            "mes" : str(fecha.month),
-                            "año" : str(fecha.year)
+                            "fecha" : str(fecha.day)+"-"+str(fecha.month)+"-"+str(fecha.year)                            
                         }
                         result = db.Registro.insert_one(dict)
                 else:
@@ -307,9 +305,9 @@ while True:
                 elif(i.type == 7):
                     Tipo = "Van"
                 cv2.putText(frame_copia,Tipo+"%.2f"%i.typeScore,(startX,startY-10),cv2.FONT_HERSHEY_SIMPLEX,0.3,(0, 255, 0),1)		                    
-                cv2.rectangle(frame_copia,(X_start_GUI,Y_start_GUI),(X_end_GUI,Y_end_GUI),(0,0,255),-1)
-                cv2.line(frame_copia,(0,int(resized.shape[0]*lineaVelocidad)),(resized.shape[1],int(resized.shape[0]*lineaVelocidad)),(255,0,0),1)
-                cv2.putText(frame_copia,"Vehiculos contados: "+str(VehiculosContados),(int((X_end_GUI+X_start_GUI)/2-200),int((Y_end_GUI+Y_start_GUI)/2)),cv2.FONT_HERSHEY_SIMPLEX,2,(0, 0, 0),2)		                    
+                #cv2.rectangle(frame_copia,(X_start_GUI,Y_start_GUI),(X_end_GUI,Y_end_GUI),(0,0,255),-1)
+                #cv2.line(frame_copia,(0,int(resized.shape[0]*lineaVelocidad)),(resized.shape[1],int(resized.shape[0]*lineaVelocidad)),(255,0,0),1)
+                #cv2.putText(frame_copia,"Vehiculos contados: "+str(VehiculosContados),(int((X_end_GUI+X_start_GUI)/2-200),int((Y_end_GUI+Y_start_GUI)/2)),cv2.FONT_HERSHEY_SIMPLEX,2,(0, 0, 0),2)		                    
         #Ahora mostramos el frame copia con los contornos dibujados
         boxesResized = escalarImagen(frame_copia,boxesPercent)
         cv2.imshow('BBoxes',boxesResized)        
