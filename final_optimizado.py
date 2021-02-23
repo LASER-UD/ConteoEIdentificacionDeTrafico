@@ -9,7 +9,7 @@ from collections import OrderedDict
 from scipy.spatial import distance as dist
 
 #Rutas importantes
-rutaVideo = './Videos_test/test3.mp4'
+rutaVideo = './Videos_test/test4.mp4'
 rutaRedVnV = './modelo_VnV.tflite'
 rutaRedTipo = './modelo_Tipo_Transfer.tflite'
 
@@ -164,8 +164,7 @@ frame_count = 0
 skip_frames = 10
 
 #limite de conteo
-limite = 0.78
-
+limite = 0.7
 #bandera de carros bajando
 Bajando = True
 
@@ -179,14 +178,17 @@ percentFrame = 100
 VehiculosContados = 0
 
 #Linea de la velocidad
-lineaVelocidad = limite - 0.1
+if(Bajando):
+    lineaVelocidad = limite - 0.1
+else:
+    lineaVelocidad = 1 -(limite-0.1)
 distanciaVelocidad = 10
 
 #Etiquetador de color
 cl = ColorLabeler()
 while True:
     ret, frame = vid.read()
-    #frame = frame[100:,:650,:]
+    frame = frame[100:,650:,:]
     #Cuadro siguiente
     if ret:    
         #INTERFAZ DEL CONTEO DE VEHICULOS        
@@ -282,6 +284,9 @@ while True:
                         }
                         result = db.Registro.insert_one(dict)
                 else:
+                    if(i.centroide[1] < resized.shape[0]*(1-lineaVelocidad) and i.pasoLinea == False):
+                        i.pasoLinea = True
+                        i.tiempoLinea = time.time()
                     if(i.centroide[1]<resized.shape[0]*(1-limite)):
                         trackedVehicle.trackedVehicles.remove(i)
                         VehiculosContados+=1
@@ -303,7 +308,7 @@ while True:
                     Tipo = "Taxi"
                 elif(i.type == 7):
                     Tipo = "Van"
-                cv2.putText(frame_copia,Tipo+"%.2f"%i.typeScore,(startX,startY-10),cv2.FONT_HERSHEY_SIMPLEX,0.3,(0, 255, 0),1)		                    
+                cv2.putText(frame_copia,Tipo+"%.2f"%i.typeScore,(startX,startY-10),cv2.FONT_HERSHEY_SIMPLEX,0.4,(0, 255, 0),1)		                    
                 cv2.rectangle(frame_copia,(X_start_GUI,Y_start_GUI),(X_end_GUI,Y_end_GUI),(0,0,255),-1)
                 cv2.line(frame_copia,(0,int(resized.shape[0]*lineaVelocidad)),(resized.shape[1],int(resized.shape[0]*lineaVelocidad)),(255,0,0),1)
                 cv2.putText(frame_copia,"Linea de velocidad",(0+20,int(resized.shape[0]*lineaVelocidad)-10),cv2.FONT_HERSHEY_SIMPLEX,0.6,(255, 0, 0),1)		                    
