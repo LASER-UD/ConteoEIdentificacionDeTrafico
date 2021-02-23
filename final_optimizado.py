@@ -5,6 +5,8 @@ import dlib
 import numpy as np
 import time
 from datetime import datetime
+from collections import OrderedDict
+from scipy.spatial import distance as dist
 
 #Rutas importantes
 rutaVideo = './Videos_test/test3.mp4'
@@ -31,10 +33,50 @@ dimension_Tipo = 200
 input_details_Tipo = interprete_Tipo.get_input_details()
 output_details_Tipo = interprete_Tipo.get_output_details()
 
+class ColorLabeler:
+
+    def labelFunc(self,image):
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
+        mean = cv2.mean(image)[:3]
+        # initialize the minimum distance found thus far
+        minDist = (np.inf, None)
+		# loop over the known L*a*b* color values
+        for (i, row) in enumerate(self.lab):
+            d = dist.euclidean(row[0], mean)
+            if d < minDist[0]:
+                minDist = (d, i)
+        
+        return self.colorNames[minDist[1]]
+        
+    def __init__(self):
+		# initialize the colors dictionary, containing the color
+		# name as the key and the RGB tuple as the value
+        colors = OrderedDict({
+			"Rojo": (255, 0, 0),            
+			"Verde": (0, 255, 0),            
+			"Azul": (0, 0, 255),            
+            "Negro": (0, 0, 0),
+            "Blanco": (255, 255, 255),            
+            "Amarillo" : (236, 208, 0)})
+		# allocate memory for the L*a*b* image, then initialize
+		# the color names list
+        self.lab = np.zeros((len(colors), 1, 3), dtype="uint8")
+        self.colorNames = []
+		# loop over the colors dictionary
+        for (i, (name, rgb)) in enumerate(colors.items()):
+			# update the L*a*b* array and the color names list
+            self.lab[i] = rgb
+            self.colorNames.append(name)
+		# convert the L*a*b* array from the RGB color space
+		# to L*a*b*
+        self.lab = cv2.cvtColor(self.lab, cv2.COLOR_RGB2LAB)
+
+    
+
 #clase trackedVehicle
 class trackedVehicle:
     trackedVehicles = []    
-    def __init__(self, x, y, w, h, vehicleScore, type, typeScore):
+    def __init__(self, x, y, w, h, vehicleScore, type, typeScore, color):
         self.x = x
         self.y = y
         self.vehicleScore = vehicleScore
@@ -42,7 +84,11 @@ class trackedVehicle:
         self.typeScore = typeScore
         self.centroide = np.array((x+(w/2), y+(h/2)))
         self.tracker = dlib.correlation_tracker()
-        self.rect = dlib.rectangle(x,y,x+w,y+h)        
+        self.rect = dlib.rectangle(x,y,x+w,y+h)
+        self.tiempoLinea = 0.0
+        self.velocidad = 0.0   
+        self.pasoLinea = False   
+        self.color = color
     def nuevoVehiculo(vehiculo):
         noExiste = True
         for i in trackedVehicle.trackedVehicles:
@@ -130,7 +176,14 @@ boxesPercent = 70
 percentFrame = 100
 
 #Vehiculos contados
-VehiculosContados = 0;
+VehiculosContados = 0
+
+#Linea de la velocidad
+lineaVelocidad = 0.68
+distanciaVelocidad = 10
+
+#Etiquetador de color
+cl = ColorLabeler()
 while True:
     ret, frame = vid.read()
     #frame = frame[100:,:650,:]
@@ -139,6 +192,7 @@ while True:
         #INTERFAZ DEL CONTEO DE VEHICULOS        
         #Resize
         resized = escalarImagen(frame,percentFrame)
+        lineaInicio = (0,)
         if(Bajando):
             X_start_GUI = 0 
             X_end_GUI = int(resized.shape[1])
@@ -163,6 +217,7 @@ while True:
         frame_copia = resized.copy()
         cv2.rectangle(frame_copia,(X_start_GUI,Y_start_GUI),(X_end_GUI,Y_end_GUI),(0,0,255),-1)
         cv2.putText(frame_copia,"Vehiculos contados: "+str(VehiculosContados),(int((X_end_GUI+X_start_GUI)/2 - 200),int((Y_end_GUI+Y_start_GUI)/2)),cv2.FONT_HERSHEY_SIMPLEX,2,(0, 0, 0),2)		                    
+        cv2.line(frame_copia,(0,int(resized.shape[0]*lineaVelocidad)),(resized.shape[1],int(resized.shape[0]*lineaVelocidad)),(255,0,0),1)
         frame_count = frame_count + 1
         if(frame_count > 100 and frame_count % skip_frames == 0):
             #Ahora detectamos los contornos en la imagen
@@ -179,9 +234,10 @@ while True:
                     ROI = frame[y:y+h,x:x+w,:]                                 
                     prediccion = distinguirROI(ROI)                                        
                     if(prediccion > 0.6):
-                        pred_tipo = clasificarVehiculo(ROI)
+                        pred_tipo = clasificarVehiculo(ROI)                        
+                        color = cl.labelFunc(ROI)
                         tipo = np.argmax(pred_tipo)
-                        vehiculo = trackedVehicle(x,y,w,h,prediccion,tipo,pred_tipo[tipo])
+                        vehiculo = trackedVehicle(x,y,w,h,prediccion,tipo,pred_tipo[tipo], color)
                         vehiculo.tracker.start_track(frame_rgb,vehiculo.rect)
                         trackedVehicle.nuevoVehiculo(vehiculo)
 
@@ -204,16 +260,23 @@ while True:
                 endY = int(pos.bottom())
                 w = endX - startX
                 h = endY - startY
-                if(w > resized.shape[1]*0.3 or h > resized.shape[0]*0.3):
+                if(w > resized.shape[1]*0.4 or h > resized.shape[0]*0.4):
                     trackedVehicle.trackedVehicles.remove(i)
                 if(Bajando):
+                    if(i.centroide[1] > resized.shape[0]*lineaVelocidad and i.pasoLinea == False):
+                        i.pasoLinea = True
+                        i.tiempoLinea = time.time()
+
                     if(i.centroide[1]>resized.shape[0]*limite):
                         trackedVehicle.trackedVehicles.remove(i)                        
                         VehiculosContados+=1
                         fecha = datetime.now()
+                        i.velocidad = 3.6*(distanciaVelocidad / (time.time() - i.tiempoLinea))
                         dict = {
                             "score" : str(i.vehicleScore),
                             "tipo" : str(i.type),
+                            "color" : str(i.color),
+                            "velocidad" : str(i.velocidad),
                             "hora" : str(fecha.hour),
                             "minuto" : str(fecha.minute),
                             "dia" : str(fecha.day),
@@ -245,6 +308,7 @@ while True:
                     Tipo = "Van"
                 cv2.putText(frame_copia,Tipo+"%.2f"%i.typeScore,(startX,startY-10),cv2.FONT_HERSHEY_SIMPLEX,0.3,(0, 255, 0),1)		                    
                 cv2.rectangle(frame_copia,(X_start_GUI,Y_start_GUI),(X_end_GUI,Y_end_GUI),(0,0,255),-1)
+                cv2.line(frame_copia,(0,int(resized.shape[0]*lineaVelocidad)),(resized.shape[1],int(resized.shape[0]*lineaVelocidad)),(255,0,0),1)
                 cv2.putText(frame_copia,"Vehiculos contados: "+str(VehiculosContados),(int((X_end_GUI+X_start_GUI)/2-200),int((Y_end_GUI+Y_start_GUI)/2)),cv2.FONT_HERSHEY_SIMPLEX,2,(0, 0, 0),2)		                    
         #Ahora mostramos el frame copia con los contornos dibujados
         boxesResized = escalarImagen(frame_copia,boxesPercent)

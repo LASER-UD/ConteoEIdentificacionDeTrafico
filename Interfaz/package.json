@@ -1,0 +1,11 @@
+{
+  "name": "interfaz",
+  "version": "1.0.0",
+  "description": "Interfaz para el proyecto de grado Conteo e Identificación de Tráfico en vídeo mediante un paradigma de inteligencia computacional",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "author": "Sebastian Bejarano",
+  "license": "ISC"
+}
